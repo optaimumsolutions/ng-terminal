@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NG Terminal</title>
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #12151a; --border: #22262e; --ink: #e6e8eb; --ink-2: #9aa3ad; --muted: #5f6873;
+    --accent: #3b82f6;
+    --nav-w: 232px; --top-h: 48px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+               font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: grid; grid-template-columns: var(--nav-w) 1fr; grid-template-rows: 100vh; }
+
+  nav { background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .brand { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .brand b { font-size: 15px; letter-spacing: 0.02em; }
+  .brand small { color: var(--muted); font-size: 11px; display: block; }
+  .items { padding: 8px; flex: 1; overflow-y: auto; }
+  .item { display: block; width: 100%; text-align: left; background: none; border: 1px solid transparent; color: var(--ink-2);
+          border-radius: 8px; padding: 10px 12px; cursor: pointer; font: inherit; margin-bottom: 4px; }
+  .item:hover { background: rgba(255,255,255,0.04); color: var(--ink); }
+  .item[aria-selected="true"] { background: rgba(59,130,246,0.14); border-color: rgba(59,130,246,0.35); color: var(--ink); }
+  .item .k { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: var(--accent); margin-right: 8px; }
+  .item .t { font-weight: 600; }
+  .item .s { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .foot { padding: 10px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+  .foot a { color: var(--ink-2); text-decoration: none; }
+  .foot a:hover { color: var(--ink); }
+
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .top { height: var(--top-h); display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; }
+  .top .status { color: var(--ink-2); font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .top .sp { flex: 1; }
+  .top a, .top button { font: inherit; font-size: 12px; color: var(--ink-2); background: none; border: 1px solid var(--border);
+                        border-radius: 6px; padding: 4px 10px; text-decoration: none; cursor: pointer; }
+  .top a:hover, .top button:hover { color: var(--ink); border-color: var(--ink-2); }
+  .frames { flex: 1; position: relative; background: #fff; }
+  .frames iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: #fff; }
+  .frames iframe.active { display: block; }
+
+  @media (max-width: 760px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+    nav { border-right: 0; border-bottom: 1px solid var(--border); }
+    .brand small, .item .s, .foot { display: none; }
+    .items { display: flex; gap: 6px; padding: 6px 8px; overflow-x: auto; }
+    .item { width: auto; white-space: nowrap; margin: 0; padding: 8px 12px; }
+    .top .status { display: none; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <div class="brand"><span class="dot"></span><div><b>NG Terminal</b><small>US natural gas desk</small></div></div>
+  <div class="items" id="items" role="tablist"></div>
+  <div class="foot">Sources: NOAA GEFS, CFTC. <a href="https://github.com/optaimumsolutions/ng-terminal">github</a></div>
+</nav>
+<main>
+  <div class="top">
+    <h1 id="title"></h1>
+    <span class="status" id="status"></span>
+    <span class="sp"></span>
+    <button id="reload" title="Reload this tab">&#x21bb; Reload</button>
+    <a id="open" target="_blank" rel="noopener">Open standalone &#x2197;</a>
+  </div>
+  <div class="frames" id="frames"></div>
+</main>
+
+<script>
+const TABS = [
+  { id: "hdd", key: "F1", title: "Weather / HDD", sub: "GEFS 15-day gas-weighted HDD, maps, accuracy",
+    url: "https://optaimumsolutions.github.io/gas-hdd/",
+    status: async () => {
+      const r = await fetch("https://optaimumsolutions.github.io/gas-hdd/latest.json", { cache: "no-store" });
+      const j = await r.json();
+      const total = j.days.reduce((a, d) => a + d.median, 0);
+      return `run ${j.run} · 15d US ${total.toFixed(1)} HDD`;
+    } },
+  { id: "cot", key: "F2", title: "COT Positioning", sub: "CFTC power & gas Commitments of Traders, weekly",
+    url: "https://optaimumsolutions.github.io/cot-electricity/",
+    status: async () => {
+      const r = await fetch("https://api.github.com/repos/optaimumsolutions/cot-electricity/contents/data/natgas");
+      if (!r.ok) return "";
+      const files = (await r.json()).map(f => f.name).filter(n => n.endsWith(".json")).sort();
+      return `latest week ${files.at(-1).replace(".json", "")} · CFTC releases Fri 3:30pm ET`;
+    } },
+];
+
+const items = document.getElementById("items"), frames = document.getElementById("frames");
+for (const t of TABS) {
+  const b = document.createElement("button");
+  b.className = "item"; b.setAttribute("role", "tab"); b.dataset.id = t.id;
+  b.innerHTML = `<span class="k">${t.key}</span><span class="t">${t.title}</span><span class="s">${t.sub}</span>`;
+  b.onclick = () => { location.hash = t.id; };
+  items.appendChild(b);
+  const f = document.createElement("iframe");
+  f.id = "frame-" + t.id; f.title = t.title;
+  frames.appendChild(f);
+}
+
+function current() { return TABS.find(t => t.id === location.hash.slice(1)) || TABS[0]; }
+
+function show() {
+  const t = current();
+  for (const b of items.children) b.setAttribute("aria-selected", b.dataset.id === t.id);
+  for (const f of frames.children) f.classList.toggle("active", f.id === "frame-" + t.id);
+  const f = document.getElementById("frame-" + t.id);
+  if (!f.src) f.src = t.url;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("open").href = t.url;
+  document.title = t.title + " · NG Terminal";
+  const s = document.getElementById("status"); s.textContent = "";
+  t.status().then(v => { if (current() === t) s.textContent = v; }).catch(() => {});
+}
+document.getElementById("reload").onclick = () => {
+  const f = frames.querySelector("iframe.active"); if (f) f.src = f.src;
+};
+window.addEventListener("hashchange", show);
+window.addEventListener("keydown", e => {
+  const t = TABS.find(t => t.key === e.key); if (t) { e.preventDefault(); location.hash = t.id; }
+});
+show();
+</script>
+</body>
+</html>
