@@ -78,8 +78,8 @@ const TABS = [
     status: async () => {
       const r = await fetch("https://optaimumsolutions.github.io/gas-hdd/latest.json", { cache: "no-store" });
       const j = await r.json();
-      const total = j.days.reduce((a, d) => a + d.median, 0);
-      return `run ${j.run} · 15d US ${total.toFixed(1)} HDD`;
+      const d = j.vs_prev ? ` (${j.vs_prev.delta >= 0 ? "+" : ""}${j.vs_prev.delta.toFixed(1)} vs prev run)` : "";
+      return `run ${j.run} · 15d US ${j.total.median.toFixed(1)} HDD${d}`;
     } },
   { id: "cot", key: "F2", title: "COT Positioning", sub: "CFTC power & gas Commitments of Traders, weekly",
     url: "https://optaimumsolutions.github.io/cot-electricity/",
