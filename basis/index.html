@@ -91,18 +91,48 @@ const HUBS = [
     why: "Huge, steady industrial demand right next to big supply, with plenty of pipes — so it trades within cents of HH. Usually a small discount because Texas is a net supplier pushing gas toward Louisiana.",
     blowout: "Extreme freeze: Feb 2021 Winter Storm Uri froze wellheads AND spiked power demand — Texas cash prices hit triple digits. Otherwise LNG outages (e.g. Freeport offline in 2022) widen the discount.",
     pipes: "Intrastate pipes (Enterprise, Kinder Morgan Texas), Transco Z1" },
+  { id: "carth", name: "Carthage (Haynesville)", region: "East Texas / NW Louisiana", lon: -94.3, lat: 32.2, arch: "push",
+    win: [-0.3, 0.0], sum: [-0.4, -0.1],
+    flow: "Haynesville dry gas flows SOUTH ~200 miles to the Louisiana LNG corridor and Henry Hub.",
+    why: "A producing hub, yet it trades only cents under HH — the opposite of Waha. Two reasons: it's very close to the LNG/HH demand, and it's DRY gas, so producers cut drilling when prices fall instead of flooding the market. That makes Haynesville the swing basin that responds to HH price.",
+    blowout: "Rarely blows out. Takeaway to the Gulf got tight as LNG grew; new gathering-to-Gulf pipes (LEG, NG3) were built around 2025 for exactly that.",
+    pipes: "Gulf South, Texas Gas, Enable/Energy Transfer, LEG, NG3" },
+  { id: "pepl", name: "Panhandle (PEPL)", region: "Mid-Continent — TX/OK Panhandle, Kansas", lon: -100.0, lat: 36.5, arch: "push",
+    win: [-0.6, 0.2], sum: [-1.0, -0.4],
+    flow: "Anadarko/Mid-Con gas flows NORTH-EAST on Panhandle Eastern to Indiana, Ohio and Michigan.",
+    why: "Older producing region that lost its Midwest market share: Rockies gas (REX), Canadian gas and Appalachian gas (Rover, NEXUS) now compete for the same Midwest demand. More gas chasing the same buyers = a steady discount, widest in summer.",
+    blowout: "Feb 2021 Winter Storm Uri: Mid-Con wells froze while heating demand exploded. Oklahoma cash (OGT) went above $1,000/MMBtu, and anyone short Mid-Con physical gas was crushed. A textbook 'push hub flips to extreme premium' event.",
+    pipes: "Panhandle Eastern, NGPL, Southern Star, ANR" },
   { id: "egs", name: "Eastern Gas South (ex-Dominion South)", region: "Appalachia — SW Pennsylvania", lon: -80.2, lat: 40.0, arch: "push",
     win: [-1.0, -0.4], sum: [-1.5, -0.7],
     flow: "Marcellus/Utica (~35 Bcf/d, the biggest US basin) pushes gas EAST to NY/New England, SOUTH-EAST to the Carolinas, and SOUTH-WEST down reversed pipes (Rover, Rockies Express, Tennessee) to the Gulf and Midwest.",
     why: "Dry gas sitting right next to the Northeast — but getting new pipes permitted in the Northeast is extremely hard, so production regularly outruns takeaway. Gas is 'trapped' and must discount to find a path out.",
     blowout: "Shoulder months (Apr–May, Sep–Oct) when local demand is low and pipes are in maintenance. Mountain Valley Pipeline (~2 Bcf/d, June 2024) narrowed the discount by opening a new path to the Southeast.",
     pipes: "Eastern Gas Transmission, Texas Eastern M2, Tennessee Z4, Mountain Valley, Rover, Equitrans" },
+  { id: "z4m", name: "Tennessee Zone 4 Marcellus", region: "NE Pennsylvania (Susquehanna/Bradford)", lon: -76.3, lat: 41.8, arch: "push", minor: true,
+    win: [-1.5, -0.5], sum: [-2.0, -1.0],
+    flow: "Some of the most prolific dry-gas wells in the US, sitting 150 miles from New York City, with only a few pipes east (Tennessee 300 Line, Transco Leidy Line).",
+    why: "The most 'trapped' gas in Appalachia: plenty of supply, too few exits, and the pipe that would have fixed it (Constitution, to New York) was cancelled in 2020. Often the deepest discount on the East Coast, even though NYC pays a huge winter premium right next door.",
+    blowout: "Spring/fall shoulder months and maintenance on Tennessee or Transco Leidy. The NY premium and the Z4 Marcellus discount are two ends of the same missing pipeline.",
+    pipes: "Tennessee 300 Line, Transco Leidy Line, Millennium" },
+  { id: "tco", name: "Columbia Gas (TCO Pool)", region: "Appalachia — WV / OH / PA", lon: -81.6, lat: 38.4, arch: "push", minor: true,
+    win: [-0.5, 0.0], sum: [-0.8, -0.3],
+    flow: "Utica/Marcellus gas into Columbia's large storage system, then SOUTH to the Gulf via Columbia Gulf (Leach/Mountaineer Xpress, 2018) and EAST to Mid-Atlantic utilities.",
+    why: "Still an Appalachian discount hub, but it has more exits (a path to the Gulf) and lots of storage, so it trades tighter to HH than Eastern Gas South or Tennessee Z4 Marcellus. Lesson: same basin, different pipes = different basis.",
+    blowout: "Same shoulder-season and maintenance pattern as other Appalachian hubs, but smaller.",
+    pipes: "Columbia Gas Transmission, Columbia Gulf, Leach Xpress, Mountaineer Xpress" },
   { id: "z6ny", name: "Transco Zone 6 NY", region: "New York City", lon: -74.0, lat: 40.7, arch: "pull",
     win: [2.0, 10.0], sum: [-1.0, -0.3],
     flow: "End-of-the-line demand: receives Appalachian gas from the west and south. Little local storage, nothing flows out.",
     why: "SUMMER: Marcellus gas is 200 miles away and pipes have room → it trades BELOW HH. WINTER: heating demand fills every pipe; once full, the marginal molecule can't get in, so price rises until enough demand is rationed (or oil-fired power switches on). That 'demand pull through a constrained pipe' is why winter premiums are huge and spiky.",
     blowout: "Cold snaps — Jan 2018 'bomb cyclone' cash traded above $100. Forward Jan/Feb basis carries a large risk premium.",
     pipes: "Transco, Texas Eastern M3, Tennessee, Iroquois" },
+  { id: "m3", name: "Tetco M3", region: "Eastern PA / NJ / Philadelphia", lon: -75.2, lat: 40.0, arch: "pull", minor: true,
+    win: [1.5, 8.0], sum: [-1.0, -0.3],
+    flow: "Market zone at the end of Texas Eastern. Receives Appalachian gas from the west (M2) and Gulf gas from the south; serves Philadelphia, New Jersey and NY-bound flows.",
+    why: "Behaves like Transco Zone 6 NY: Marcellus gas is next door, so in summer it trades BELOW HH; in winter the pipes into the Mid-Atlantic fill up and it carries a big, spiky premium. M3 vs Z6 NY is a common relative-value spread between two Northeast pull hubs.",
+    blowout: "Cold snaps (Jan 2014 polar vortex, Jan 2018) sent Northeast citygate cash, including M3, far above $20. Texas Eastern outages and force majeure events also spike it.",
+    pipes: "Texas Eastern (Tetco), Transco, Columbia" },
   { id: "agt", name: "Algonquin Citygates", region: "New England (Boston)", lon: -71.1, lat: 42.4, arch: "pull",
     win: [5.0, 20.0], sum: [-0.7, 0.2],
     flow: "Farthest end of the pipe from Appalachia. In winter it also takes LNG IMPORTS (Everett, offshore buoys) and burns oil in power plants when gas is too expensive.",
@@ -115,12 +145,24 @@ const HUBS = [
     why: "Power burn makes it a demand-pull market year-round, with a winter spike when heating + power both peak. Summer premium is small but positive because Southeast power burn is strong in heat.",
     blowout: "Cold snaps (Winter Storm Elliott, Dec 2022). Growing data-center and coal-to-gas switching demand supports the premium structurally.",
     pipes: "Transco, Mountain Valley (via Transco Station 165)" },
+  { id: "stn85", name: "Transco Zone 4 (Station 85)", region: "Alabama — Southeast gateway", lon: -86.6, lat: 32.6, arch: "par",
+    win: [0.0, 0.8], sum: [-0.1, 0.2],
+    flow: "Pooling point where Gulf Coast gas (and southbound Appalachian gas) collects on Transco before heading north-east to the Carolinas and Mid-Atlantic.",
+    why: "Upstream of the Southeast demand centers but close to Gulf supply, so it trades near HH. Comparing Station 85 with Zone 5 South shows how much of the Southeast premium comes from congestion on the last stretch of pipe.",
+    blowout: "Southeast cold snaps (Elliott, Dec 2022) and strong summer power burn add a small premium.",
+    pipes: "Transco, Southern Natural, Mountain Valley/Southgate flows" },
   { id: "chi", name: "Chicago Citygates", region: "Midwest", lon: -87.7, lat: 41.9, arch: "par",
     win: [-0.1, 0.6], sum: [-0.4, -0.1],
     flow: "Crossroads: receives Canadian (Alliance, Vector), Rockies (REX), Appalachian (Rover, NEXUS) and Mid-Con gas, with large storage in Illinois/Michigan.",
     why: "Many supply options + big storage = rarely constrained, so basis stays near HH. Small summer discount (plenty of gas, injection season), small winter premium.",
     blowout: "Polar vortex events (Jan 2019) briefly spike cash. Otherwise the most 'boring' big hub — good contrast to the Northeast.",
     pipes: "NGPL, Alliance, Vector, Rockies Express, Northern Border, ANR" },
+  { id: "mich", name: "Michcon", region: "Michigan (Detroit)", lon: -83.2, lat: 42.4, arch: "par", minor: true,
+    win: [-0.1, 0.4], sum: [-0.5, -0.1],
+    flow: "Receives Appalachian gas (Rover, NEXUS), Canadian gas (Vector) and Mid-Con gas (Panhandle); exchanges gas with Dawn, the big Ontario storage hub.",
+    why: "Michigan has the most underground gas storage of any US state, so it's rarely short: near-par basis. Summer discount (injection season, lots of Appalachian gas arriving), small winter premium.",
+    blowout: "Polar vortex events (Jan 2019, when a Consumers Energy compressor fire led to calls for customers to turn down thermostats).",
+    pipes: "DTE/Michcon, Consumers, Vector, Rover, NEXUS, Panhandle" },
   { id: "aeco", name: "AECO", region: "Alberta, Canada", lon: -114.0, lat: 51.0, arch: "push",
     win: [-2.0, -1.0], sum: [-2.5, -1.25],
     flow: "Western Canadian Sedimentary Basin pushes gas SOUTH into the US (Midwest via Northern Border/Alliance, West via GTN to California) and to Canadian LNG (LNG Canada, first cargo mid-2025).",
@@ -145,6 +187,12 @@ const HUBS = [
     why: "Steady premium: long haul from every supply source + California's carbon costs (cap-and-trade) are priced into citygate gas. Less spiky than SoCal because supply is more diverse.",
     blowout: "Same Western events as SoCal (Dec 2022), drought years that cut hydro and raise gas-fired power burn.",
     pipes: "PG&E Backbone, Gas Transmission Northwest, Ruby" },
+  { id: "malin", name: "Malin", region: "Oregon / California border", lon: -121.4, lat: 42.0, arch: "par", minor: true,
+    win: [-0.2, 1.5], sum: [-0.5, 0.0],
+    flow: "Where Canadian gas (GTN) and Rockies gas (Ruby) meet before entering PG&E's system to Northern California.",
+    why: "A transit point between supply (Canada/Rockies) and California demand, so it sits between them: usually a small discount, flipping to a premium when the West is cold. PG&E Citygate minus Malin roughly equals the cost (and congestion) of getting into California.",
+    blowout: "Western cold + low storage (Dec 2022), GTN or Ruby outages.",
+    pipes: "Gas Transmission Northwest (GTN), Ruby, PG&E Redwood path" },
   { id: "sumas", name: "Northwest Sumas", region: "WA / BC border", lon: -122.3, lat: 49.0, arch: "push",
     win: [0.0, 3.0], sum: [-1.0, -0.3],
     flow: "Canadian BC gas flows south on Westcoast/T-South into the Pacific Northwest (Northwest Pipeline) — one main pipe.",
@@ -161,7 +209,8 @@ const HUBS = [
 
 const BASINS = [
   { name: "PERMIAN", lon: -102.5, lat: 32.2 },
-  { name: "HAYNESVILLE", lon: -93.6, lat: 32.4 },
+  { name: "MID-CON", lon: -98.0, lat: 35.2 },
+  { name: "HAYNESVILLE", lon: -92.4, lat: 34.0 },
   { name: "MARCELLUS/UTICA", lon: -78.8, lat: 41.4 },
   { name: "ROCKIES", lon: -108.0, lat: 42.8 },
   { name: "WCSB (Canada)", lon: -116.0, lat: 52.3 },
@@ -169,7 +218,8 @@ const BASINS = [
 // [fromLon, fromLat, toLon, toLat, bend] — dominant flow directions
 const FLOWS = [
   [-102.5, 31.6, -95.6, 29.9, 0.15], [-103.4, 31.0, -100.0, 26.3, -0.2], [-103.6, 31.4, -117.6, 34.2, -0.15],
-  [-93.6, 32.1, -92.2, 30.2, 0.2],
+  [-93.6, 32.1, -92.2, 30.2, 0.2], [-99.6, 36.8, -84.0, 42.0, -0.12],
+  [-76.3, 41.6, -74.3, 40.9, 0.2],
   [-79.8, 40.6, -74.4, 40.8, -0.2], [-79.8, 40.6, -71.6, 42.3, -0.25], [-80.4, 39.6, -80.9, 35.6, 0.2],
   [-80.6, 39.8, -91.6, 30.4, 0.15], [-80.8, 40.2, -87.3, 41.8, -0.15],
   [-113.5, 50.6, -88.2, 42.2, -0.15], [-114.5, 50.6, -121.8, 38.2, 0.15], [-118.0, 50.0, -122.1, 49.2, 0.3],
@@ -244,6 +294,18 @@ const BASIS_QS = [
   { q: "It's late March, New England storage is irrelevant, and pipes have room. A trader is long April Algonquin basis at +$4. Most likely outcome?",
     o: ["Basis settles near par/small — loss", "Basis spikes to +$20 — big win", "Settles exactly +$4", "Algonquin goes negative"], a: 0,
     why: "Once heating season ends, pipes uncongest and Algonquin collapses toward HH. Winter premiums don't survive into spring." },
+  { q: "Carthage (Haynesville) and Waha are both producing hubs. Why does Carthage trade within cents of HH while Waha trades dollars under?",
+    o: ["Haynesville is dry gas close to Gulf LNG; producers slow drilling when price falls", "Haynesville gas is higher quality", "Carthage is quoted in a different currency", "Waha is regulated"], a: 0,
+    why: "Distance + gas type. Haynesville is ~200 miles from LNG demand and is drilled FOR gas, so supply responds to price. Permian gas is an oil by-product far from the coast, so it floods out regardless of price." },
+  { q: "February 2021, Winter Storm Uri: Mid-Con wells freeze while heating demand spikes. What happens to Panhandle/Mid-Con cash basis?",
+    o: ["Widens its usual discount", "Flips to an enormous premium", "Stays near its summer level", "Goes negative like Waha"], a: 1,
+    why: "A push hub only discounts when gas must LEAVE. When local supply freezes off and local demand surges, gas must come IN, so the hub becomes a pull market overnight. Oklahoma cash went above $1,000/MMBtu." },
+  { q: "Constitution Pipeline (NE Pennsylvania to New York) was cancelled in 2020. Which pair of hubs did that keep apart?",
+    o: ["Tennessee Z4 Marcellus discount and Transco Z6 NY winter premium", "Waha and SoCal", "AECO and Chicago", "Henry Hub and Houston Ship Channel"], a: 0,
+    why: "A missing pipe keeps the source discount AND the destination premium. Tennessee Z4 Marcellus stays trapped, NYC stays constrained in winter." },
+  { q: "It's July. Tetco M3 (Philadelphia/NJ) basis is most likely...",
+    o: ["A small-to-moderate DISCOUNT to HH", "A +$5 premium", "Exactly equal to Algonquin's winter premium", "Negative outright price"], a: 0,
+    why: "Like Z6 NY, M3 sits next to Marcellus supply. With summer pipes uncongested it trades below HH; the premium only appears in winter." },
 ];
 
 function fixedPriceQ() {
@@ -300,6 +362,9 @@ const LABEL_AT = {
   hh: (x, y, r) => ["start", x + r + 4, y - 8],
   hsc: (x, y, r) => ["end", x - r - 2, y + 16],
   egs: (x, y, r) => ["end", x - r - 4, y + 14],
+  stn85: (x, y, r) => ["start", x + r + 4, y + 4],
+  carth: (x, y, r) => ["middle", x, y - r - 5],
+  rox: (x, y, r) => ["middle", x, y + r + 13],
 };
 function basisMapSVG() {
   const outline = US_OUTLINE.map(p => `${PX(p[0]).toFixed(0)},${PY(p[1]).toFixed(0)}`).join(" ");
@@ -318,7 +383,8 @@ function basisMapSVG() {
       : [right ? "start" : "end", right ? x + rad + 4 : x - rad - 4, y + 4];
     return `<g class="hubdot" data-h="${h.id}" style="cursor:pointer">
       <circle cx="${x}" cy="${y}" r="${rad}" fill="${ARCH_COL[h.arch]}" fill-opacity="${on ? .95 : .6}" stroke="${on ? "#fff" : "none"}" stroke-width="2"/>
-      <text x="${lx}" y="${ly}" fill="${on ? "#fff" : "#c3c2b7"}" font-size="11" text-anchor="${anc}">${esc(h.name.split(" (")[0].split(" /")[0])} ${h.arch === "bench" ? "" : brange(r)}</text></g>`;
+      <title>${esc(h.name)} · ${h.arch === "bench" ? "benchmark" : brange(r)}</title>
+      ${h.minor && !on ? "" : `<text x="${lx}" y="${ly}" fill="${on ? "#fff" : "#c3c2b7"}" font-size="11" text-anchor="${anc}">${esc(h.name.split(" (")[0].split(" /")[0])} ${h.arch === "bench" ? "" : brange(r)}</text>`}</g>`;
   }).join("");
   return `<svg viewBox="-10 0 1010 520" style="width:100%;height:auto;display:block" role="img" aria-label="US gas hubs and typical basis to Henry Hub">
     <defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#898781" fill-opacity=".7"/></marker></defs>
@@ -350,7 +416,7 @@ function renderModeE() {
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
         <button class="navbtn ${E.season === "win" ? "on" : ""}" data-s="win">WINTER (Jan)</button>
         <button class="navbtn ${E.season === "sum" ? "on" : ""}" data-s="sum">SUMMER (Jul)</button>
-        <span class="muted" style="font-size:11px">dot size = size of basis · <span style="color:#d03b3b">●</span> push/discount <span style="color:#0ca30c">●</span> pull/premium <span style="color:#3987e5">●</span> near par</span>
+        <span class="muted" style="font-size:11px">dot size = size of basis · unlabeled dots: hover or click · <span style="color:#d03b3b">●</span> push/discount <span style="color:#0ca30c">●</span> pull/premium <span style="color:#3987e5">●</span> near par</span>
       </div>
       <div id="emap">${basisMapSVG()}</div>
       <p class="muted" style="font-size:11px">Arrows = dominant physical flow. Ranges are rule-of-thumb monthly (bidweek) basis from recent years, compiled from public reporting — NOT live or licensed data. Check ICE forwards before trading anything.</p>
