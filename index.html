@@ -89,6 +89,9 @@ const TABS = [
       const files = (await r.json()).map(f => f.name).filter(n => n.endsWith(".json")).sort();
       return `latest week ${files.at(-1).replace(".json", "")} · CFTC releases Fri 3:30pm ET`;
     } },
+  { id: "basis", key: "F3", title: "Basis Swaps", sub: "US hubs vs Henry Hub: push vs pull, map + drill",
+    url: "basis/",
+    status: async () => "rule-of-thumb ranges from public reporting · not live basis data" },
 ];
 
 const items = document.getElementById("items"), frames = document.getElementById("frames");

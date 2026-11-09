@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gas Basis</title>
+<style>
+:root{
+  color-scheme:dark;
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --sec:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
+  --blue:#3987e5; --amber:#c98500; --pos:#0ca30c; --neg:#d03b3b;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--page);color:var(--ink);font:13px/1.5 "Cascadia Mono","Consolas",monospace;padding:0 0 40px}
+header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:5}
+header h1{font-size:15px;letter-spacing:2px}
+header h1 b{color:var(--amber)}
+#cutoff{color:var(--muted);font-size:11px;margin-left:auto}
+main{max-width:1180px;margin:18px auto;padding:0 22px}
+.navbtn{background:none;border:1px solid var(--border);color:var(--sec);font:inherit;padding:4px 12px;cursor:pointer;letter-spacing:1px}
+.navbtn.on,.navbtn:hover{border-color:var(--amber);color:var(--ink)}
+.card{background:var(--surface);border:1px solid var(--border);padding:14px 16px}
+.card.click{cursor:pointer}
+.card.click:hover{border-color:var(--amber)}
+.card h2{font-size:12px;letter-spacing:2px;color:var(--amber);margin-bottom:8px}
+.card p{margin:4px 0}
+.homegrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.agrid{display:grid;grid-template-columns:minmax(330px,2fr) 3fr;gap:14px;align-items:start}
+@media(max-width:900px){.homegrid,.agrid{grid-template-columns:1fr}}
+.roundhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.roundhead h2{font-size:14px;letter-spacing:2px}
+.score{color:var(--sec)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl td,.tbl th{padding:3px 8px;text-align:left;border-bottom:1px solid var(--grid)}
+.tbl th{color:var(--muted);font-weight:normal;font-size:11px;letter-spacing:1px}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl .sect td{color:var(--muted);letter-spacing:2px;font-size:11px;padding-top:9px;border-bottom:1px solid var(--baseline)}
+.tbl .hl td{background:rgba(201,133,0,.12)}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .muted{color:var(--muted)}
+.buckets{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.bk{background:var(--page);border:1px solid var(--border);color:var(--ink);font:inherit;padding:10px 4px;cursor:pointer;letter-spacing:1px}
+.bk span{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.bk:hover:not(:disabled){border-color:var(--blue);background:rgba(57,135,229,.08)}
+.bk:disabled{opacity:.5;cursor:default}
+.btn{background:var(--page);border:1px solid var(--amber);color:var(--ink);font:inherit;padding:6px 14px;cursor:pointer;letter-spacing:1px}
+.btn:hover{background:rgba(201,133,0,.12)}
+.btn.ghost{border-color:var(--border);color:var(--sec)}
+input{background:var(--page);border:1px solid var(--border);color:var(--ink);font:inherit;padding:3px 6px}
+.abbr{border-bottom:1px dotted var(--muted);cursor:help;position:relative}
+.abbr:hover::after{content:attr(data-tip);position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:260px;background:var(--page);border:1px solid var(--amber);padding:8px 10px;color:var(--sec);font-size:11px;line-height:1.45;white-space:normal}
+.chartwrap{position:relative}
+.charttip{display:none;position:absolute;z-index:15;background:var(--page);border:1px solid var(--border);padding:6px 9px;font-size:11px;pointer-events:none;min-width:150px}
+sup{color:var(--muted)}
+</style>
+</head>
+<body>
+<main><div id="view"></div></main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const STORE_KEY = "ng_basis_v1";
+function loadState() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; } }
+function saveState(s) { try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch (e) {} }
+let STATE = loadState();
+</script>
+<script>
+/* Mode E: Basis — learn US gas hub basis vs Henry Hub, then drill it.
+   Content is rule-of-thumb education (public reporting, recent years), NOT licensed basis data. */
+"use strict";
+
+/* ===================== content ===================== */
+// arch: "bench" | "push" (supply region, discount) | "pull" (demand region, premium) | "par" (near HH)
+// win/sum: typical monthly (bidweek) basis vs HH, $/MMBtu, recent years. [low, high]
+const HUBS = [
+  { id: "hh", name: "Henry Hub", region: "South Louisiana (Erath)", lon: -92.0, lat: 29.95, arch: "bench",
+    win: [0, 0], sum: [0, 0],
+    flow: "Hub of ~13 interconnecting pipelines next to the Gulf Coast LNG export corridor. Gas arrives from Haynesville, Appalachia (via reversed pipes), and the Permian (via Texas).",
+    why: "It is the NYMEX delivery point, so every other hub is quoted as HH + basis. Lots of pipes + storage + LNG demand make it the most liquid, least-congested price in North America.",
+    blowout: "Doesn't 'blow out' — it IS the reference. But LNG feedgas growth (Plaquemines, Corpus Christi Stage 3, Golden Pass) pulls more gas toward it, which tends to lift HH relative to producing basins.",
+    pipes: "Sabine Pipe Line, Transco, Texas Gas, Gulf South, ANR, Tennessee" },
+  { id: "waha", name: "Waha", region: "Permian Basin, West Texas", lon: -103.1, lat: 31.2, arch: "push",
+    win: [-1.5, -0.5], sum: [-3.0, -1.0],
+    flow: "Pushes gas EAST to the Gulf Coast (Katy/Agua Dulce → LNG + Houston industry), SOUTH to Mexico, and WEST to Arizona/California on El Paso & Transwestern.",
+    why: "Permian gas is ASSOCIATED gas — a by-product of oil drilling. Producers drill for $70 oil, so gas keeps coming even when the gas price is terrible. When takeaway pipes are full, the only way to clear the excess is a deep discount; at the extreme the price goes NEGATIVE (producers pay to have gas taken so they can keep pumping oil).",
+    blowout: "Pipeline maintenance (cuts takeaway for days), production growth outrunning new pipes. Cash went negative in 2019 and repeatedly in 2024. New pipes narrow it for a while (Permian Highway 2021, Matterhorn Express ~2.5 Bcf/d in late 2024; Blackcomb/Hugh Brinson/GCX expansion slated 2026) until production catches up again.",
+    pipes: "Permian Highway, Gulf Coast Express, Whistler, Matterhorn Express, El Paso, Transwestern" },
+  { id: "hsc", name: "Houston Ship Channel / Katy", region: "Texas Gulf Coast", lon: -95.3, lat: 29.75, arch: "par",
+    win: [-0.2, 0.1], sum: [-0.25, 0.05],
+    flow: "Receives Permian + East Texas + Haynesville gas; delivers to petrochemical plants, Texas power, and LNG (Freeport, Corpus via Agua Dulce).",
+    why: "Huge, steady industrial demand right next to big supply, with plenty of pipes — so it trades within cents of HH. Usually a small discount because Texas is a net supplier pushing gas toward Louisiana.",
+    blowout: "Extreme freeze: Feb 2021 Winter Storm Uri froze wellheads AND spiked power demand — Texas cash prices hit triple digits. Otherwise LNG outages (e.g. Freeport offline in 2022) widen the discount.",
+    pipes: "Intrastate pipes (Enterprise, Kinder Morgan Texas), Transco Z1" },
+  { id: "egs", name: "Eastern Gas South (ex-Dominion South)", region: "Appalachia — SW Pennsylvania", lon: -80.2, lat: 40.0, arch: "push",
+    win: [-1.0, -0.4], sum: [-1.5, -0.7],
+    flow: "Marcellus/Utica (~35 Bcf/d, the biggest US basin) pushes gas EAST to NY/New England, SOUTH-EAST to the Carolinas, and SOUTH-WEST down reversed pipes (Rover, Rockies Express, Tennessee) to the Gulf and Midwest.",
+    why: "Dry gas sitting right next to the Northeast — but getting new pipes permitted in the Northeast is extremely hard, so production regularly outruns takeaway. Gas is 'trapped' and must discount to find a path out.",
+    blowout: "Shoulder months (Apr–May, Sep–Oct) when local demand is low and pipes are in maintenance. Mountain Valley Pipeline (~2 Bcf/d, June 2024) narrowed the discount by opening a new path to the Southeast.",
+    pipes: "Eastern Gas Transmission, Texas Eastern M2, Tennessee Z4, Mountain Valley, Rover, Equitrans" },
+  { id: "z6ny", name: "Transco Zone 6 NY", region: "New York City", lon: -74.0, lat: 40.7, arch: "pull",
+    win: [2.0, 10.0], sum: [-1.0, -0.3],
+    flow: "End-of-the-line demand: receives Appalachian gas from the west and south. Little local storage, nothing flows out.",
+    why: "SUMMER: Marcellus gas is 200 miles away and pipes have room → it trades BELOW HH. WINTER: heating demand fills every pipe; once full, the marginal molecule can't get in, so price rises until enough demand is rationed (or oil-fired power switches on). That 'demand pull through a constrained pipe' is why winter premiums are huge and spiky.",
+    blowout: "Cold snaps — Jan 2018 'bomb cyclone' cash traded above $100. Forward Jan/Feb basis carries a large risk premium.",
+    pipes: "Transco, Texas Eastern M3, Tennessee, Iroquois" },
+  { id: "agt", name: "Algonquin Citygates", region: "New England (Boston)", lon: -71.1, lat: 42.4, arch: "pull",
+    win: [5.0, 20.0], sum: [-0.7, 0.2],
+    flow: "Farthest end of the pipe from Appalachia. In winter it also takes LNG IMPORTS (Everett, offshore buoys) and burns oil in power plants when gas is too expensive.",
+    why: "The most constrained market in the US: proposed pipelines (Constitution, NESE) were cancelled, so winter peak demand exceeds pipe capacity. The marginal winter supply is imported LNG, so Algonquin's winter price is set by the GLOBAL LNG price (TTF/JKM), not by HH. Highest winter premium in the country.",
+    blowout: "Cold + high global LNG prices (winter 2022–23 after Russia/Ukraine). Summer it collapses to par/discount because pipes have spare room.",
+    pipes: "Algonquin, Tennessee Z6, Iroquois, Maritimes & Northeast" },
+  { id: "z5s", name: "Transco Zone 5 South", region: "Carolinas / Southeast", lon: -80.8, lat: 35.2, arch: "pull",
+    win: [1.0, 6.0], sum: [0.2, 0.8],
+    flow: "Receives gas from the Gulf (northbound Transco) and Appalachia (southbound, MVP). Serves fast-growing Southeast power + data center load.",
+    why: "Power burn makes it a demand-pull market year-round, with a winter spike when heating + power both peak. Summer premium is small but positive because Southeast power burn is strong in heat.",
+    blowout: "Cold snaps (Winter Storm Elliott, Dec 2022). Growing data-center and coal-to-gas switching demand supports the premium structurally.",
+    pipes: "Transco, Mountain Valley (via Transco Station 165)" },
+  { id: "chi", name: "Chicago Citygates", region: "Midwest", lon: -87.7, lat: 41.9, arch: "par",
+    win: [-0.1, 0.6], sum: [-0.4, -0.1],
+    flow: "Crossroads: receives Canadian (Alliance, Vector), Rockies (REX), Appalachian (Rover, NEXUS) and Mid-Con gas, with large storage in Illinois/Michigan.",
+    why: "Many supply options + big storage = rarely constrained, so basis stays near HH. Small summer discount (plenty of gas, injection season), small winter premium.",
+    blowout: "Polar vortex events (Jan 2019) briefly spike cash. Otherwise the most 'boring' big hub — good contrast to the Northeast.",
+    pipes: "NGPL, Alliance, Vector, Rockies Express, Northern Border, ANR" },
+  { id: "aeco", name: "AECO", region: "Alberta, Canada", lon: -114.0, lat: 51.0, arch: "push",
+    win: [-2.0, -1.0], sum: [-2.5, -1.25],
+    flow: "Western Canadian Sedimentary Basin pushes gas SOUTH into the US (Midwest via Northern Border/Alliance, West via GTN to California) and to Canadian LNG (LNG Canada, first cargo mid-2025).",
+    why: "Far from big markets, landlocked until LNG Canada → it must discount enough to pay long-haul transport. Quoted in CAD/GJ, so FX also moves the USD basis.",
+    blowout: "Pipeline maintenance on NOVA/NGTL system (summer) can send AECO cash near zero. LNG Canada ramp-up is the structural tightener to watch.",
+    pipes: "NGTL/NOVA, Alliance, Foothills, Northern Border, Gas Transmission Northwest" },
+  { id: "rox", name: "Rockies (Opal / CIG)", region: "Wyoming / Colorado", lon: -110.3, lat: 41.8, arch: "push",
+    win: [-0.2, 1.0], sum: [-0.8, -0.3],
+    flow: "Pushes gas WEST to California (Kern River, Ruby) and EAST to the Midwest (Rockies Express).",
+    why: "Producing region with declining but steady supply → summer discount. In winter it gets pulled by West Coast cold (it's the closest supply to California/Nevada), so it can flip to a premium.",
+    blowout: "Western cold + low storage (Dec 2022 — Western hubs blew out to $20–50 cash).",
+    pipes: "Kern River, Rockies Express, Ruby, Northwest Pipeline, CIG" },
+  { id: "socal", name: "SoCal Citygate", region: "Southern California", lon: -118.2, lat: 34.05, arch: "pull",
+    win: [0.5, 3.0], sum: [0.3, 1.5],
+    flow: "Receives Permian & San Juan gas from the east (El Paso, Transwestern) and Rockies gas (Kern River). Nothing flows out.",
+    why: "Big demand pull at the end of long pipes, with limited in-state storage (Aliso Canyon has been capacity-restricted since its 2015 leak). Summer heat + low hydro years support a premium even in summer.",
+    blowout: "Dec 2022: cold West + low storage + El Paso pipe outage → SoCal Citygate cash near $50. Pipeline outages on El Paso Line 2000 are the classic trigger.",
+    pipes: "SoCalGas system, El Paso, Transwestern, Kern River" },
+  { id: "pge", name: "PG&E Citygate", region: "Northern California", lon: -122.0, lat: 37.8, arch: "pull",
+    win: [0.8, 3.0], sum: [0.8, 2.0],
+    flow: "Receives Canadian gas (GTN), Rockies gas (Ruby, Kern), and Southwest gas.",
+    why: "Steady premium: long haul from every supply source + California's carbon costs (cap-and-trade) are priced into citygate gas. Less spiky than SoCal because supply is more diverse.",
+    blowout: "Same Western events as SoCal (Dec 2022), drought years that cut hydro and raise gas-fired power burn.",
+    pipes: "PG&E Backbone, Gas Transmission Northwest, Ruby" },
+  { id: "sumas", name: "Northwest Sumas", region: "WA / BC border", lon: -122.3, lat: 49.0, arch: "push",
+    win: [0.0, 3.0], sum: [-1.0, -0.3],
+    flow: "Canadian BC gas flows south on Westcoast/T-South into the Pacific Northwest (Northwest Pipeline) — one main pipe.",
+    why: "Summer: Canadian supply surplus, mild weather → discount. Winter: a single-pipe region with little storage, so any cold or outage spikes it. A supply-push hub that flips to demand-pull when the one pipe is stressed.",
+    blowout: "Oct 2018 Enbridge Westcoast rupture (BC) cut supply → Sumas spiked for months. Dec 2022 Western cold.",
+    pipes: "Enbridge Westcoast (T-South), Northwest Pipeline" },
+  { id: "fgt", name: "FGT Citygate (Florida)", region: "Florida", lon: -82.0, lat: 28.5, arch: "pull",
+    win: [0.3, 1.5], sum: [0.3, 1.0],
+    flow: "Peninsula at the end of two pipes (Florida Gas Transmission, Sabal Trail/Gulfstream). Gas comes from the Gulf Coast & Transco Zone 4.",
+    why: "Florida burns gas for ~75% of its power, and its peak is SUMMER air conditioning — so it carries a premium even in July, unlike the Northeast.",
+    blowout: "Heat waves, hurricanes disrupting Gulf supply.",
+    pipes: "Florida Gas Transmission, Sabal Trail, Gulfstream" },
+];
+
+const BASINS = [
+  { name: "PERMIAN", lon: -102.5, lat: 32.2 },
+  { name: "HAYNESVILLE", lon: -93.6, lat: 32.4 },
+  { name: "MARCELLUS/UTICA", lon: -78.8, lat: 41.4 },
+  { name: "ROCKIES", lon: -108.0, lat: 42.8 },
+  { name: "WCSB (Canada)", lon: -116.0, lat: 52.3 },
+];
+// [fromLon, fromLat, toLon, toLat, bend] — dominant flow directions
+const FLOWS = [
+  [-102.5, 31.6, -95.6, 29.9, 0.15], [-103.4, 31.0, -100.0, 26.3, -0.2], [-103.6, 31.4, -117.6, 34.2, -0.15],
+  [-93.6, 32.1, -92.2, 30.2, 0.2],
+  [-79.8, 40.6, -74.4, 40.8, -0.2], [-79.8, 40.6, -71.6, 42.3, -0.25], [-80.4, 39.6, -80.9, 35.6, 0.2],
+  [-80.6, 39.8, -91.6, 30.4, 0.15], [-80.8, 40.2, -87.3, 41.8, -0.15],
+  [-113.5, 50.6, -88.2, 42.2, -0.15], [-114.5, 50.6, -121.8, 38.2, 0.15], [-118.0, 50.0, -122.1, 49.2, 0.3],
+  [-109.6, 41.6, -118.0, 34.4, 0.15],
+];
+
+const CONCEPTS = [
+  ["Basis = local price − Henry Hub",
+   "Every US gas hub is quoted as a spread to Henry Hub. If HH is $3.00 and Waha basis is −$1.50, Waha gas is worth $1.50. Fixed price at any hub = HH futures + basis."],
+  ["What a basis swap is",
+   "A financially settled swap on the spread. You lock a fixed basis (say −$1.50 for Waha July). At settlement you receive/pay: (monthly index at the hub − NYMEX HH final settle) − fixed basis. Usually the hub's monthly bidweek index (Platts IFERC) vs the NYMEX last-day settle, cleared on ICE. A producer hedged only on HH futures still has BASIS RISK — this swap closes it."],
+  ["The three things inside basis",
+   "① Transport cost between the hub and HH (sets the 'normal' level). ② Congestion: when pipes between two hubs are full, the spread stops being transport cost and becomes whatever it takes to ration flow — this is what blows basis out. ③ Local supply/demand shocks (weather, outages, maintenance)."],
+  ["Supply PUSH vs demand PULL",
+   "PUSH hubs sit in producing basins (Waha, Eastern Gas South, AECO, Rockies): gas must leave, so they trade at a DISCOUNT that widens when takeaway is full. PULL hubs sit at the end of the pipe in big demand centers (Transco Z6 NY, Algonquin, SoCal): gas must come in, so they carry a PREMIUM that spikes when inbound pipes are full."],
+  ["Seasonality",
+   "Northeast pull hubs: big winter premium (heating), summer at par or discount. Florida / Southeast / California: premium in summer too (power burn for A/C). Producing hubs: often widest in the SHOULDER months (spring/fall) — low local demand + pipeline maintenance season."],
+  ["Why Waha can go negative",
+   "Permian gas is a by-product of oil. Shutting in an oil well to avoid selling gas costs far more than paying someone to take the gas, so when pipes are full, producers accept negative prices. Dry-gas basins (Haynesville, Marcellus) don't do this — those producers just slow drilling."],
+  ["What a new pipeline does",
+   "A new pipe between a push hub and a pull hub narrows BOTH spreads: discount at the source shrinks, premium at the destination shrinks. Traders price pipe in-service dates years ahead — delays are a big basis catalyst."],
+];
+
+/* ===================== quiz ===================== */
+// Hand-written scenarios. a = index of correct option.
+const BASIS_QS = [
+  { q: "A major Permian takeaway pipeline goes down for 10 days of maintenance in April. What does Waha cash basis do?",
+    o: ["Widens (more negative)", "Narrows toward zero", "Flips to a premium", "No change — it's priced off oil"], a: 0,
+    why: "Less takeaway with the same associated-gas production = more trapped gas. Waha must discount harder to clear; it can go negative outright." },
+  { q: "A new 2.5 Bcf/d pipeline from the Permian to the Gulf Coast enters service. Waha basis…",
+    o: ["Widens", "Narrows (less negative)", "Unaffected, Waha follows HH 1:1", "Turns positive permanently"], a: 1,
+    why: "More exit capacity means trapped gas can reach the Gulf, so the congestion component shrinks. It narrows — until production growth fills the new pipe." },
+  { q: "January forecast flips to a major cold blast in the Northeast. Which forward basis moves the MOST?",
+    o: ["Waha", "Algonquin Citygates", "Houston Ship Channel", "AECO"], a: 1,
+    why: "Algonquin is the most pipe-constrained market. Once pipes are full, price rises until demand is rationed or LNG/oil is bid in — so it reacts far more than HH." },
+  { q: "It's July and mild in New York. Where does Transco Zone 6 NY usually trade vs Henry Hub?",
+    o: ["Big premium (+$3 or more)", "Small discount", "Exactly $0.00", "Negative outright price"], a: 1,
+    why: "Summer: pipes from Marcellus have spare room and Marcellus gas is next door, so NYC actually trades BELOW HH. The premium is a winter phenomenon." },
+  { q: "Why is Algonquin's winter price often linked to global LNG (TTF/JKM) rather than HH?",
+    o: ["Because NYMEX settles in Boston", "Because the marginal winter supply into New England is imported LNG", "Because New England exports LNG", "Because Algonquin is in Canada"], a: 1,
+    why: "When pipes are full, the next molecule comes off an LNG tanker at Everett, which has to compete with Europe/Asia for that cargo. The marginal supply sets the price." },
+  { q: "Appalachian production rises 1 Bcf/d but no new pipeline capacity is added. Eastern Gas South basis…",
+    o: ["Widens (more negative)", "Narrows", "Flips to a premium", "Converges to Waha"], a: 0,
+    why: "Classic supply push: more gas trying to squeeze through the same exit pipes → bigger discount needed to clear it." },
+  { q: "Mountain Valley Pipeline (~2 Bcf/d, Appalachia → Southeast) entered service in 2024. Effect on Transco Zone 5 South's premium?",
+    o: ["Premium rises", "Premium shrinks (more supply reaches the Southeast)", "No effect — different pipe", "Zone 5 goes negative"], a: 1,
+    why: "New inbound supply to a pull market reduces congestion on the way in — the premium narrows. And Appalachian discount narrows too. Pipes compress both ends." },
+  { q: "Which hub carries a premium to HH in SUMMER as well as winter, because its peak demand is A/C power burn?",
+    o: ["Transco Zone 6 NY", "FGT Citygate (Florida)", "Eastern Gas South", "AECO"], a: 1,
+    why: "Florida burns gas for most of its electricity and peaks in summer. Northeast premiums are heating-driven and collapse in summer." },
+  { q: "A producer in the Permian sold HH futures at $3.50 to hedge. Waha basis then blows out from −$1.00 to −$3.00. What happened to the producer's realized price?",
+    o: ["Unchanged — fully hedged", "Fell by ~$2.00 — the hedge didn't cover basis", "Rose by $2.00", "Fell to zero"], a: 1,
+    why: "HH futures only hedge the HH price. The producer sells physical gas at Waha = HH + basis, so the $2 basis move hits them directly. That's what a Waha basis swap is for." },
+  { q: "Pipeline maintenance cuts flows OUT of the Rockies to California in October. What happens to Opal basis and SoCal Citygate basis?",
+    o: ["Opal widens, SoCal premium rises", "Both narrow", "Opal narrows, SoCal falls", "Both unchanged"], a: 0,
+    why: "Same constraint, two sides: gas backs up at the source (discount widens) and can't reach the destination (premium rises). A pipe outage pushes the push and pull hubs further apart." },
+  { q: "Chicago Citygates basis is usually within ~$0.50 of HH. Main reason?",
+    o: ["Chicago is next to Henry Hub", "Many supply pipes + large storage mean it's rarely congested", "Chicago gas is regulated", "Chicago is a producing basin"], a: 1,
+    why: "Canadian, Rockies, Appalachian and Mid-Con gas all reach Chicago, plus big Midwest storage. With many options, no single pipe sets the price." },
+  { q: "LNG Canada (BC export terminal) ramps up. What does it do to AECO basis over time?",
+    o: ["Widens the discount", "Narrows the discount — new demand for landlocked Alberta gas", "No effect", "Makes AECO trade above HH"], a: 1,
+    why: "A new outlet for trapped supply is effectively a new 'pipe' out of the basin. AECO's discount should shrink as feedgas ramps." },
+  { q: "US Gulf Coast LNG export capacity grows by several Bcf/d. Typical effect on Waha and Eastern Gas South vs HH?",
+    o: ["Both narrow", "HH gets pulled up relative to producing basins → their discounts can WIDEN unless new pipes reach the Gulf", "Both turn to premiums", "No effect on basis, only on HH"], a: 1,
+    why: "LNG demand sits next to Henry Hub. It lifts HH; distant producing hubs only follow if they have pipe space to the Gulf. If not, the spread to HH widens." },
+  { q: "Which hub's gas is most likely to trade at a NEGATIVE outright price?",
+    o: ["Henry Hub", "Waha", "Algonquin", "PG&E Citygate"], a: 1,
+    why: "Associated gas + constrained takeaway. Oil economics force gas to flow regardless of price." },
+  { q: "Why does PG&E Citygate keep a fairly steady premium even in mild weather?",
+    o: ["Long haul from every supply basin + California carbon costs", "California produces too much gas", "It's tied to Waha", "It's quoted in CAD"], a: 0,
+    why: "Every molecule arrives via a long pipe (Canada, Rockies, Southwest) and California's cap-and-trade cost is built into delivered gas." },
+  { q: "It's late March, New England storage is irrelevant, and pipes have room. A trader is long April Algonquin basis at +$4. Most likely outcome?",
+    o: ["Basis settles near par/small — loss", "Basis spikes to +$20 — big win", "Settles exactly +$4", "Algonquin goes negative"], a: 0,
+    why: "Once heating season ends, pipes uncongest and Algonquin collapses toward HH. Winter premiums don't survive into spring." },
+];
+
+function fixedPriceQ() {
+  // generated math drill: fixed price = HH + basis, or back out basis
+  const pool = HUBS.filter(h => h.arch !== "bench");
+  const h = pool[Math.floor(Math.random() * pool.length)];
+  const season = Math.random() < 0.5 ? "win" : "sum";
+  const [lo, hi] = h[season];
+  const basis = Math.round((lo + Math.random() * (hi - lo)) * 20) / 20;
+  const hh = Math.round((2.5 + Math.random() * 2.5) * 20) / 20;
+  const ans = hh + basis;
+  const offs = [0, 0.5, -0.5, 2 * basis === 0 ? 1 : -2 * basis].map(d => ans + d);
+  const opts = [...new Set(offs.map(v => v.toFixed(2)))];
+  while (opts.length < 4) opts.push((ans + opts.length * 0.25).toFixed(2));
+  const shuffled = opts.slice(0, 4).sort(() => Math.random() - 0.5);
+  const mon = season === "win" ? "January" : "July";
+  return {
+    q: `HH ${mon} futures = $${hh.toFixed(2)}. ${h.name} ${mon} basis = ${basis >= 0 ? "+" : "−"}$${Math.abs(basis).toFixed(2)}. What fixed price can you lock for ${h.name} gas?`,
+    o: shuffled.map(v => "$" + v), a: shuffled.indexOf(ans.toFixed(2)),
+    why: `Fixed price = HH + basis = $${hh.toFixed(2)} ${basis >= 0 ? "+" : "−"} $${Math.abs(basis).toFixed(2)} = $${ans.toFixed(2)}. To lock it you'd buy/sell HH futures AND a ${h.name} basis swap.`,
+  };
+}
+
+function pushPullQ() {
+  const pool = HUBS.filter(h => h.arch === "push" || h.arch === "pull");
+  const h = pool[Math.floor(Math.random() * pool.length)];
+  return {
+    q: `${h.name} (${h.region}) — supply PUSH hub or demand PULL hub?`,
+    o: ["Supply PUSH (trades at a discount)", "Demand PULL (trades at a premium)"], a: h.arch === "push" ? 0 : 1,
+    why: h.why,
+  };
+}
+
+function nextBasisQ() {
+  const r = Math.random();
+  if (r < 0.2) return fixedPriceQ();
+  if (r < 0.35) return pushPullQ();
+  return BASIS_QS[Math.floor(Math.random() * BASIS_QS.length)];
+}
+
+/* ===================== view ===================== */
+const E = { season: "win", hub: "waha" };
+const ARCH_COL = { bench: "#c98500", push: "#d03b3b", pull: "#0ca30c", par: "#3987e5" };
+const ARCH_TXT = { bench: "benchmark", push: "supply push → discount", pull: "demand pull → premium", par: "near par" };
+const bfmt = v => (v > 0 ? "+" : v < 0 ? "−" : "") + "$" + Math.abs(v).toFixed(2);
+const brange = r => r[0] === r[1] ? bfmt(r[0]) : `${bfmt(r[0])} to ${bfmt(r[1])}`;
+
+// equirectangular projection, lat stretched ~1/cos(40°)
+const PX = lon => (lon + 125.5) * 14;
+const PY = lat => (53.5 - lat) * 18;
+const US_OUTLINE = [[-124.7,48.4],[-123,49],[-95.2,49],[-95.2,49.4],[-89.6,48],[-84.8,46.5],[-83,46],[-82.4,43],[-79,43.3],[-76.8,43.6],[-75,45],[-71.5,45],[-69.2,47.4],[-67.8,47.1],[-67,44.8],[-70,43.7],[-70.6,42.6],[-70,41.7],[-71.9,41.3],[-73.9,40.6],[-74,39.7],[-75,38.8],[-75.9,37.2],[-76.3,36.9],[-75.5,35.2],[-77.9,33.9],[-79.2,33.2],[-81,31.8],[-81.4,30.4],[-80,26.8],[-80.4,25.2],[-81.7,25.9],[-82.6,27.9],[-83,29.1],[-84.3,30],[-86.5,30.4],[-88,30.6],[-89.5,30.2],[-89.4,29],[-91,29.2],[-93.8,29.7],[-95,29.3],[-97.2,27.7],[-97.4,25.9],[-99.2,26.5],[-101.4,29.8],[-103,29],[-104.7,30],[-106.5,31.8],[-108.2,31.3],[-111.1,31.3],[-114.8,32.5],[-117.1,32.5],[-118.5,34],[-120.6,34.6],[-122.4,37.2],[-124.2,40.4],[-124.5,42.8],[-124,46.3]];
+
+const LABEL_AT = {
+  hh: (x, y, r) => ["start", x + r + 4, y - 8],
+  hsc: (x, y, r) => ["end", x - r - 2, y + 16],
+  egs: (x, y, r) => ["end", x - r - 4, y + 14],
+};
+function basisMapSVG() {
+  const outline = US_OUTLINE.map(p => `${PX(p[0]).toFixed(0)},${PY(p[1]).toFixed(0)}`).join(" ");
+  const flows = FLOWS.map(([a, b, c, d, k]) => {
+    const x1 = PX(a), y1 = PY(b), x2 = PX(c), y2 = PY(d);
+    const mx = (x1 + x2) / 2 - (y2 - y1) * k, my = (y1 + y2) / 2 + (x2 - x1) * k;
+    return `<path d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" fill="none" stroke="#898781" stroke-opacity=".45" stroke-width="2" marker-end="url(#arr)"/>`;
+  }).join("");
+  const basins = BASINS.map(b => `<text x="${PX(b.lon)}" y="${PY(b.lat)}" fill="#898781" font-size="11" letter-spacing="1" text-anchor="middle">${b.name}</text>`).join("");
+  const dots = HUBS.map(h => {
+    const x = PX(h.lon), y = PY(h.lat), r = h[E.season], mid = (r[0] + r[1]) / 2;
+    const rad = 5 + Math.min(9, Math.sqrt(Math.abs(mid)) * 3.2), on = h.id === E.hub;
+    // label placement: right of dot for coasts, left inland; a few hand overrides to avoid collisions
+    const right = (h.lon > -85 && h.id !== "chi") || h.lon < -117;
+    const [anc, lx, ly] = LABEL_AT[h.id] ? LABEL_AT[h.id](x, y, rad)
+      : [right ? "start" : "end", right ? x + rad + 4 : x - rad - 4, y + 4];
+    return `<g class="hubdot" data-h="${h.id}" style="cursor:pointer">
+      <circle cx="${x}" cy="${y}" r="${rad}" fill="${ARCH_COL[h.arch]}" fill-opacity="${on ? .95 : .6}" stroke="${on ? "#fff" : "none"}" stroke-width="2"/>
+      <text x="${lx}" y="${ly}" fill="${on ? "#fff" : "#c3c2b7"}" font-size="11" text-anchor="${anc}">${esc(h.name.split(" (")[0].split(" /")[0])} ${h.arch === "bench" ? "" : brange(r)}</text></g>`;
+  }).join("");
+  return `<svg viewBox="-10 0 1010 520" style="width:100%;height:auto;display:block" role="img" aria-label="US gas hubs and typical basis to Henry Hub">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#898781" fill-opacity=".7"/></marker></defs>
+    <polygon points="${outline}" fill="#1f1f1d" stroke="#383835" stroke-width="1.5"/>
+    <text x="${PX(-97)}" y="${PY(26.4)}" fill="#898781" font-size="10">→ MEXICO</text>
+    <text x="${PX(-92.6)}" y="${PY(28.6)}" fill="#c98500" font-size="10">LNG EXPORTS ▼</text>
+    ${flows}${basins}${dots}</svg>`;
+}
+
+function hubCard(h) {
+  return `<h2>${esc(h.name).toUpperCase()} <span class="muted" style="letter-spacing:0">· ${esc(h.region)}</span></h2>
+    <p><span style="color:${ARCH_COL[h.arch]}">● ${ARCH_TXT[h.arch]}</span></p>
+    ${h.arch === "bench" ? "" : `<table class="tbl" style="margin:6px 0"><tr><th>typical basis vs HH</th><th class="num">winter (Dec–Feb)</th><th class="num">summer (Jun–Aug)</th></tr>
+      <tr><td>$/MMBtu</td><td class="num">${brange(h.win)}</td><td class="num">${brange(h.sum)}</td></tr></table>`}
+    <p><b>Where the gas goes:</b> ${esc(h.flow)}</p>
+    <p><b>Why it trades this way:</b> ${esc(h.why)}</p>
+    <p><b>What blows it out:</b> ${esc(h.blowout)}</p>
+    <p class="muted">Pipes: ${esc(h.pipes)}</p>`;
+}
+
+function renderModeE() {
+  const st = (STATE.e = STATE.e || { n: 0, ok: 0 });
+  $("#view").innerHTML = `
+  <div class="roundhead"><div><h2>BASIS — where gas is pushed, where it's pulled</h2>
+  <span class="muted">Every hub = Henry Hub + basis. Click a hub on the map. Then drill it below.</span></div>
+  <div class="score">basis drill ${st.ok}/${st.n}</div></div>
+  <div class="agrid" style="grid-template-columns:3fr 2fr">
+    <div class="card">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+        <button class="navbtn ${E.season === "win" ? "on" : ""}" data-s="win">WINTER (Jan)</button>
+        <button class="navbtn ${E.season === "sum" ? "on" : ""}" data-s="sum">SUMMER (Jul)</button>
+        <span class="muted" style="font-size:11px">dot size = size of basis · <span style="color:#d03b3b">●</span> push/discount <span style="color:#0ca30c">●</span> pull/premium <span style="color:#3987e5">●</span> near par</span>
+      </div>
+      <div id="emap">${basisMapSVG()}</div>
+      <p class="muted" style="font-size:11px">Arrows = dominant physical flow. Ranges are rule-of-thumb monthly (bidweek) basis from recent years, compiled from public reporting — NOT live or licensed data. Check ICE forwards before trading anything.</p>
+    </div>
+    <div class="card" id="ehub">${hubCard(HUBS.find(h => h.id === E.hub))}</div>
+  </div>
+  <div class="card" style="margin-top:14px"><h2>CORE IDEAS (read once, top to bottom)</h2>
+    ${CONCEPTS.map(([t, b], i) => `<p style="margin:8px 0"><b>${i + 1}. ${esc(t)}</b><br><span style="color:var(--sec)">${esc(b)}</span></p>`).join("")}
+  </div>
+  <div class="card" style="margin-top:14px"><h2>ALL HUBS — cheat sheet</h2>
+    <table class="tbl"><tr><th>hub</th><th>type</th><th class="num">winter basis</th><th class="num">summer basis</th></tr>
+    ${HUBS.map(h => `<tr class="click" data-h="${h.id}" style="cursor:pointer"><td>${esc(h.name)}</td><td><span style="color:${ARCH_COL[h.arch]}">●</span> ${ARCH_TXT[h.arch]}</td>
+      <td class="num">${brange(h.win)}</td><td class="num">${brange(h.sum)}</td></tr>`).join("")}</table>
+  </div>
+  <div class="card" style="margin-top:14px" id="equiz"></div>`;
+
+  const bindMap = () => document.querySelectorAll("#emap .hubdot").forEach(g => g.onclick = () => selHub(g.dataset.h));
+  const selHub = id => {
+    E.hub = id;
+    $("#emap").innerHTML = basisMapSVG(); bindMap();
+    $("#ehub").innerHTML = hubCard(HUBS.find(h => h.id === id));
+  };
+  bindMap();
+  document.querySelectorAll("tr[data-h]").forEach(r => r.onclick = () => { selHub(r.dataset.h); $("#ehub").scrollIntoView({ behavior: "smooth", block: "nearest" }); });
+  document.querySelectorAll("button[data-s]").forEach(b => b.onclick = () => {
+    E.season = b.dataset.s;
+    document.querySelectorAll("button[data-s]").forEach(x => x.classList.toggle("on", x === b));
+    $("#emap").innerHTML = basisMapSVG(); bindMap();
+  });
+  quizE();
+}
+
+function quizE() {
+  const q = nextBasisQ(), st = STATE.e;
+  $("#equiz").innerHTML = `<h2>BASIS DRILL</h2><p style="margin-bottom:10px">${esc(q.q)}</p>
+    <div class="buckets" style="grid-template-columns:repeat(2,1fr)">
+    ${q.o.map((o, i) => `<button class="bk" data-i="${i}" style="text-align:left;padding:10px 12px">${esc(o)}</button>`).join("")}</div>
+    <div id="eans"></div>`;
+  document.querySelectorAll("#equiz .bk").forEach(b => b.onclick = () => {
+    const ok = +b.dataset.i === q.a;
+    st.n++; if (ok) st.ok++; saveState(STATE);
+    document.querySelectorAll("#equiz .bk").forEach(x => {
+      x.disabled = true;
+      if (+x.dataset.i === q.a) x.style.borderColor = "var(--pos)";
+      else if (x === b) x.style.borderColor = "var(--neg)";
+    });
+    $("#eans").innerHTML = `<p style="margin-top:10px">${ok ? "<span class='pos'>CORRECT</span>" : `<span class='neg'>MISS</span> — answer: <b>${esc(q.o[q.a])}</b>`}</p>
+      <p style="color:var(--sec)">▸ ${esc(q.why)}</p>
+      <button class="btn" id="enext" style="margin-top:8px">NEXT QUESTION ▶</button>`;
+    document.querySelector(".roundhead .score").textContent = `basis drill ${st.ok}/${st.n}`;
+    $("#enext").onclick = quizE;
+  });
+}
+
+
+</script>
+<script>window.addEventListener("DOMContentLoaded", renderModeE);</script>
+</body>
+</html>
