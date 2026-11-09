@@ -347,11 +347,13 @@ function nextBasisQ() {
 }
 
 /* ===================== view ===================== */
-const E = { season: "win", hub: "waha" };
+const E = { season: "win", hub: "waha", labels: "key" };
 const ARCH_COL = { bench: "#c98500", push: "#d03b3b", pull: "#0ca30c", par: "#3987e5" };
 const ARCH_TXT = { bench: "benchmark", push: "supply push → discount", pull: "demand pull → premium", par: "near par" };
+const ARCH_SHORT = { bench: "BENCHMARK", push: "SUPPLY PUSH", pull: "DEMAND PULL", par: "NEAR PAR" };
 const bfmt = v => (v > 0 ? "+" : v < 0 ? "−" : "") + "$" + Math.abs(v).toFixed(2);
 const brange = r => r[0] === r[1] ? bfmt(r[0]) : `${bfmt(r[0])} to ${bfmt(r[1])}`;
+const bcol = r => { const m = (r[0] + r[1]) / 2; return m > 0.05 ? "var(--pos)" : m < -0.05 ? "var(--neg)" : "var(--sec)"; };
 
 // equirectangular projection, lat stretched ~1/cos(40°)
 const PX = lon => (lon + 125.5) * 14;
@@ -365,108 +367,228 @@ const LABEL_AT = {
   stn85: (x, y, r) => ["start", x + r + 4, y + 4],
   carth: (x, y, r) => ["middle", x, y - r - 5],
   rox: (x, y, r) => ["middle", x, y + r + 13],
+  agt: (x, y, r) => ["middle", x - 20, y - r - 7],
+  // only drawn when "all labels" is on or the hub is selected
+  m3: (x, y, r) => ["end", x - r - 3, y + 14],
+  z4m: (x, y, r) => ["middle", x, y - r - 5],
+  tco: (x, y, r) => ["end", x - r - 4, y + 4],
+  mich: (x, y, r) => ["middle", x, y - r - 5],
+  malin: (x, y, r) => ["start", x + r + 4, y + 4],
 };
+
+const BX_CSS = `<style>
+.bx-top{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;align-items:start}
+@media(max-width:1000px){.bx-top{grid-template-columns:1fr}}
+.bx-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.bx-seg{display:inline-flex;border:1px solid var(--border)}
+.bx-seg button{background:none;border:0;color:var(--muted);font:inherit;font-size:11px;letter-spacing:1px;padding:5px 12px;cursor:pointer}
+.bx-seg button+button{border-left:1px solid var(--border)}
+.bx-seg button.on{background:rgba(201,133,0,.16);color:var(--ink)}
+.bx-seg button:hover:not(.on){color:var(--ink)}
+.bx-leg{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px;margin-left:auto}
+.bx-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.bx-map{background:#141413;border:1px solid var(--grid)}
+.bx-map svg{width:100%;height:auto;display:block}
+.bx-map .hubdot circle.d{transition:fill-opacity .12s}
+.bx-map .hubdot:hover circle.d{fill-opacity:1}
+.bx-map .hubdot:hover text{fill:#fff}
+.bx-map text{paint-order:stroke;stroke:#141413;stroke-width:3px;stroke-linejoin:round}
+.bx-panel{position:sticky;top:64px;max-height:calc(100vh - 80px);overflow:auto}
+.bx-pill{display:inline-block;font-size:10px;letter-spacing:1.5px;padding:2px 8px;border:1px solid currentColor;margin:4px 0 10px}
+.bx-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.bx-tile{background:var(--page);border:1px solid var(--grid);padding:8px 10px}
+.bx-tile .l{font-size:10px;letter-spacing:1.5px;color:var(--muted)}
+.bx-tile .v{font-size:13px;white-space:nowrap;margin-top:2px;font-variant-numeric:tabular-nums}
+.bx-sec{margin-top:12px}
+.bx-sec .l{font-size:10px;letter-spacing:1.5px;color:var(--amber);margin-bottom:3px}
+.bx-sec p{color:var(--sec);margin:0}
+.bx-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.bx-chips span{font-size:11px;border:1px solid var(--grid);padding:1px 7px;color:var(--sec)}
+.bx-rb{position:relative;height:16px;background:var(--page);border:1px solid var(--grid);min-width:140px}
+.bx-rb .z{position:absolute;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
+.bx-rb .s{position:absolute;height:5px}
+.bx-rb .s.w{top:2px}.bx-rb .s.u{bottom:2px;opacity:.55}
+.bx-rb .c{position:absolute;right:2px;top:0;font-size:9px;color:var(--muted);line-height:14px}
+.bx-ideas{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
+.bx-idea{background:var(--page);border:1px solid var(--grid);padding:10px 12px}
+.bx-idea b{display:block;margin-bottom:4px}
+.bx-idea b span{color:var(--amber);margin-right:6px}
+.bx-idea p{color:var(--sec);margin:0}
+.bx-tbl tr.click:hover td{background:rgba(201,133,0,.08)}
+.bx-tbl tr.sel td{background:rgba(201,133,0,.14)}
+.bx-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:700px){.bx-opts{grid-template-columns:1fr}}
+.bx-opt{display:flex;gap:10px;align-items:flex-start;text-align:left;background:var(--page);border:1px solid var(--border);color:var(--ink);font:inherit;padding:10px 12px;cursor:pointer}
+.bx-opt b{color:var(--muted);min-width:14px}
+.bx-opt:hover:not(:disabled){border-color:var(--blue);background:rgba(57,135,229,.08)}
+.bx-opt:disabled{cursor:default;opacity:.55}
+.bx-opt.ok{border-color:var(--pos);opacity:1;background:rgba(12,163,12,.08)}
+.bx-opt.bad{border-color:var(--neg);opacity:1;background:rgba(208,59,59,.08)}
+.bx-ans{margin-top:12px;border-left:3px solid var(--muted);padding:6px 12px;background:var(--page)}
+.bx-ans.ok{border-color:var(--pos)}.bx-ans.bad{border-color:var(--neg)}
+</style>`;
+
+// shared basis scale for range bars: −$3 … +$10 (Algonquin's winter top is clipped, marked ▸)
+const RB_LO = -3, RB_HI = 10;
+const rbx = v => (Math.max(RB_LO, Math.min(RB_HI, v)) - RB_LO) / (RB_HI - RB_LO) * 100;
+function rangeBar(h) {
+  if (h.arch === "bench") return `<div class="bx-rb"><div class="z" style="left:${rbx(0)}%"></div></div>`;
+  const seg = (r, cls) => `<div class="s ${cls}" style="left:${rbx(r[0])}%;width:${Math.max(1.2, rbx(r[1]) - rbx(r[0]))}%;background:${bcol(r)}"></div>`;
+  const clip = Math.max(h.win[1], h.sum[1]) > RB_HI ? `<span class="c">▸</span>` : "";
+  return `<div class="bx-rb" title="winter (top) / summer (bottom), scale −$3 to +$10">
+    <div class="z" style="left:${rbx(0)}%"></div>${seg(h.win, "w")}${seg(h.sum, "u")}${clip}</div>`;
+}
+
 function basisMapSVG() {
   const outline = US_OUTLINE.map(p => `${PX(p[0]).toFixed(0)},${PY(p[1]).toFixed(0)}`).join(" ");
   const flows = FLOWS.map(([a, b, c, d, k]) => {
     const x1 = PX(a), y1 = PY(b), x2 = PX(c), y2 = PY(d);
     const mx = (x1 + x2) / 2 - (y2 - y1) * k, my = (y1 + y2) / 2 + (x2 - x1) * k;
-    return `<path d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" fill="none" stroke="#898781" stroke-opacity=".45" stroke-width="2" marker-end="url(#arr)"/>`;
+    return `<path d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" fill="none" stroke="#898781" stroke-opacity=".35" stroke-width="1.6" marker-end="url(#arr)"/>`;
   }).join("");
-  const basins = BASINS.map(b => `<text x="${PX(b.lon)}" y="${PY(b.lat)}" fill="#898781" font-size="11" letter-spacing="1" text-anchor="middle">${b.name}</text>`).join("");
-  const dots = HUBS.map(h => {
+  const basins = BASINS.map(b => `<text x="${PX(b.lon)}" y="${PY(b.lat)}" fill="#6f6d68" font-size="10" letter-spacing="2" text-anchor="middle">${b.name}</text>`).join("");
+  // geometry first, then greedy label placement so labels never sit on dots, basins or each other
+  const G = HUBS.map(h => {
     const x = PX(h.lon), y = PY(h.lat), r = h[E.season], mid = (r[0] + r[1]) / 2;
     const rad = 5 + Math.min(9, Math.sqrt(Math.abs(mid)) * 3.2), on = h.id === E.hub;
-    // label placement: right of dot for coasts, left inland; a few hand overrides to avoid collisions
-    const right = (h.lon > -85 && h.id !== "chi") || h.lon < -117;
-    const [anc, lx, ly] = LABEL_AT[h.id] ? LABEL_AT[h.id](x, y, rad)
-      : [right ? "start" : "end", right ? x + rad + 4 : x - rad - 4, y + 4];
+    const nm = h.name.split(" (")[0].split(" /")[0];
+    return { h, x, y, r, mid, rad, on, nm, show: on || !h.minor || E.labels === "all",
+      chars: nm.length + (h.arch === "bench" ? 0 : 1 + brange(r).length) };
+  });
+  const boxes = G.map(g => ({ x0: g.x - g.rad - 2, x1: g.x + g.rad + 2, y0: g.y - g.rad - 2, y1: g.y + g.rad + 2, own: g.h.id }))
+    .concat(BASINS.map(b => { const w = b.name.length * 8; return { x0: PX(b.lon) - w / 2, x1: PX(b.lon) + w / 2, y0: PY(b.lat) - 9, y1: PY(b.lat) + 2 }; }));
+  const hit = (q, own) => q.x0 < -5 || q.x1 > 995 || boxes.some(o => o.own !== own && q.x0 < o.x1 && q.x1 > o.x0 && q.y0 < o.y1 && q.y1 > o.y0);
+  const prio = g => g.on ? 0 : g.h.minor ? 2 : 1;
+  G.slice().sort((a, b) => prio(a) - prio(b)).forEach(g => {
+    if (!g.show) return;
+    const { x, y, rad } = g, w = g.chars * (g.on ? 7.6 : 7.0);
+    const right = (g.h.lon > -85 && g.h.id !== "chi") || g.h.lon < -117;
+    const pref = LABEL_AT[g.h.id] ? LABEL_AT[g.h.id](x, y, rad) : [right ? "start" : "end", right ? x + rad + 4 : x - rad - 4, y + 4];
+    const cands = [pref, ["start", x + rad + 4, y + 4], ["end", x - rad - 4, y + 4], ["middle", x, y - rad - 5], ["middle", x, y + rad + 13],
+      ["start", x - 6, y - rad - 5], ["end", x + 6, y - rad - 5], ["start", x - 6, y + rad + 13], ["end", x + 6, y + rad + 13],
+      ["middle", x, y - rad - 20], ["end", x - rad - 4, y - 12], ["start", x + rad + 4, y - 12]];
+    const box = ([anc, lx, ly]) => { const x0 = anc === "start" ? lx : anc === "end" ? lx - w : lx - w / 2; return { x0, x1: x0 + w, y0: ly - 12, y1: ly + 4 }; };
+    // first clean spot; if none, the spot with the least overlapping area
+    const over = q => boxes.reduce((t, o) => o.own === g.h.id ? t : t + Math.max(0, Math.min(q.x1, o.x1) - Math.max(q.x0, o.x0)) * Math.max(0, Math.min(q.y1, o.y1) - Math.max(q.y0, o.y0)), 0)
+      + (q.x0 < -5 || q.x1 > 995 ? 1e6 : 0);
+    g.lab = cands.find(c => !hit(box(c), g.h.id)) || cands.reduce((best, c) => over(box(c)) < over(box(best)) ? c : best);
+    boxes.push(box(g.lab));
+  });
+  const order = G.slice().sort((a, b) => a.on - b.on); // selected drawn on top
+  const dots = order.map(({ h, x, y, r, mid, rad, on, nm, lab }) => {
     return `<g class="hubdot" data-h="${h.id}" style="cursor:pointer">
-      <circle cx="${x}" cy="${y}" r="${rad}" fill="${ARCH_COL[h.arch]}" fill-opacity="${on ? .95 : .6}" stroke="${on ? "#fff" : "none"}" stroke-width="2"/>
+      ${on ? `<circle cx="${x}" cy="${y}" r="${rad + 5}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>` : ""}
+      <circle class="d" cx="${x}" cy="${y}" r="${rad}" fill="${ARCH_COL[h.arch]}" fill-opacity="${on ? 1 : .7}" stroke="${on ? "#fff" : "#141413"}" stroke-width="${on ? 2 : 1}"/>
+      <circle cx="${x}" cy="${y}" r="${rad + 6}" fill="transparent"/>
       <title>${esc(h.name)} · ${h.arch === "bench" ? "benchmark" : brange(r)}</title>
-      ${h.minor && !on ? "" : `<text x="${lx}" y="${ly}" fill="${on ? "#fff" : "#c3c2b7"}" font-size="11" text-anchor="${anc}">${esc(h.name.split(" (")[0].split(" /")[0])} ${h.arch === "bench" ? "" : brange(r)}</text>`}</g>`;
+      ${lab ? `<text x="${lab[1]}" y="${lab[2]}" font-size="${on ? 12 : 11}" text-anchor="${lab[0]}"><tspan fill="${on ? "#fff" : "#dcdbd3"}" font-weight="${on ? "bold" : "normal"}">${esc(nm)}</tspan>${h.arch === "bench" ? "" :
+        `<tspan fill="${mid > 0.05 ? "#3fc53f" : mid < -0.05 ? "#ec6a6a" : "#9a9890"}"> ${brange(r)}</tspan>`}</text>` : ""}</g>`;
   }).join("");
-  return `<svg viewBox="-10 0 1010 520" style="width:100%;height:auto;display:block" role="img" aria-label="US gas hubs and typical basis to Henry Hub">
-    <defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#898781" fill-opacity=".7"/></marker></defs>
-    <polygon points="${outline}" fill="#1f1f1d" stroke="#383835" stroke-width="1.5"/>
-    <text x="${PX(-97)}" y="${PY(26.4)}" fill="#898781" font-size="10">→ MEXICO</text>
-    <text x="${PX(-92.6)}" y="${PY(28.6)}" fill="#c98500" font-size="10">LNG EXPORTS ▼</text>
+  return `<svg viewBox="-5 10 1000 495" role="img" aria-label="US gas hubs and typical basis to Henry Hub">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#898781" fill-opacity=".6"/></marker></defs>
+    <polygon points="${outline}" fill="#1d1d1b" stroke="#3a3a37" stroke-width="1.5"/>
+    <text x="${PX(-97)}" y="${PY(26.4)}" fill="#6f6d68" font-size="10" letter-spacing="1">→ MEXICO</text>
+    <text x="${PX(-92.6)}" y="${PY(28.6)}" fill="#c98500" font-size="10" letter-spacing="1">LNG EXPORTS ▼</text>
     ${flows}${basins}${dots}</svg>`;
 }
 
 function hubCard(h) {
-  return `<h2>${esc(h.name).toUpperCase()} <span class="muted" style="letter-spacing:0">· ${esc(h.region)}</span></h2>
-    <p><span style="color:${ARCH_COL[h.arch]}">● ${ARCH_TXT[h.arch]}</span></p>
-    ${h.arch === "bench" ? "" : `<table class="tbl" style="margin:6px 0"><tr><th>typical basis vs HH</th><th class="num">winter (Dec–Feb)</th><th class="num">summer (Jun–Aug)</th></tr>
-      <tr><td>$/MMBtu</td><td class="num">${brange(h.win)}</td><td class="num">${brange(h.sum)}</td></tr></table>`}
-    <p><b>Where the gas goes:</b> ${esc(h.flow)}</p>
-    <p><b>Why it trades this way:</b> ${esc(h.why)}</p>
-    <p><b>What blows it out:</b> ${esc(h.blowout)}</p>
-    <p class="muted">Pipes: ${esc(h.pipes)}</p>`;
+  const tile = (l, r) => `<div class="bx-tile"><div class="l">${l}</div><div class="v" style="color:${bcol(r)}">${brange(r)}</div></div>`;
+  return `<h2 style="margin-bottom:2px">${esc(h.name).toUpperCase()}</h2>
+    <div class="muted">${esc(h.region)}</div>
+    <span class="bx-pill" style="color:${ARCH_COL[h.arch]}">● ${ARCH_SHORT[h.arch]}</span>
+    ${h.arch === "bench" ? `<div class="bx-tile" style="margin-bottom:10px"><div class="l">BASIS</div><div class="v">$0.00 — the reference price</div></div>` :
+      `<div class="bx-tiles">${tile("WINTER BASIS · DEC–FEB", h.win)}${tile("SUMMER BASIS · JUN–AUG", h.sum)}</div>
+       ${rangeBar(h)}<div class="muted" style="font-size:10px;margin-top:3px">range bar: winter (top) · summer (bottom) · scale −$3 to +$10, | = HH</div>`}
+    <div class="bx-sec"><div class="l">WHERE THE GAS GOES</div><p>${esc(h.flow)}</p></div>
+    <div class="bx-sec"><div class="l">WHY IT TRADES THIS WAY</div><p>${esc(h.why)}</p></div>
+    <div class="bx-sec"><div class="l">WHAT BLOWS IT OUT</div><p>${esc(h.blowout)}</p></div>
+    <div class="bx-sec"><div class="l">PIPES</div><div class="bx-chips">${h.pipes.split(", ").map(x => `<span>${esc(x)}</span>`).join("")}</div></div>`;
 }
 
+const ARCH_ORDER = { bench: 0, pull: 1, par: 2, push: 3 };
 function renderModeE() {
   const st = (STATE.e = STATE.e || { n: 0, ok: 0 });
-  $("#view").innerHTML = `
+  const main = document.querySelector("main"); if (main) main.style.maxWidth = "1600px";
+  const rows = HUBS.slice().sort((a, b) => ARCH_ORDER[a.arch] - ARCH_ORDER[b.arch] || (b.win[0] + b.win[1]) - (a.win[0] + a.win[1]));
+  const seg = (k, opts) => `<div class="bx-seg">${opts.map(([v, l]) => `<button data-${k}="${v}" class="${E[k === "s" ? "season" : "labels"] === v ? "on" : ""}">${l}</button>`).join("")}</div>`;
+  $("#view").innerHTML = BX_CSS + `
   <div class="roundhead"><div><h2>BASIS — where gas is pushed, where it's pulled</h2>
-  <span class="muted">Every hub = Henry Hub + basis. Click a hub on the map. Then drill it below.</span></div>
-  <div class="score">basis drill ${st.ok}/${st.n}</div></div>
-  <div class="agrid" style="grid-template-columns:3fr 2fr">
+  <span class="muted">Every hub = Henry Hub + basis. Click any hub on the map or in the table. Drill at the bottom.</span></div>
+  <div class="score" id="escore"></div></div>
+  <div class="bx-top">
     <div class="card">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
-        <button class="navbtn ${E.season === "win" ? "on" : ""}" data-s="win">WINTER (Jan)</button>
-        <button class="navbtn ${E.season === "sum" ? "on" : ""}" data-s="sum">SUMMER (Jul)</button>
-        <span class="muted" style="font-size:11px">dot size = size of basis · unlabeled dots: hover or click · <span style="color:#d03b3b">●</span> push/discount <span style="color:#0ca30c">●</span> pull/premium <span style="color:#3987e5">●</span> near par</span>
+      <div class="bx-bar">
+        ${seg("s", [["win", "WINTER · JAN"], ["sum", "SUMMER · JUL"]])}
+        ${seg("l", [["key", "KEY LABELS"], ["all", "ALL LABELS"]])}
+        <div class="bx-leg"><span><i style="background:#d03b3b"></i>push · discount</span><span><i style="background:#0ca30c"></i>pull · premium</span><span><i style="background:#3987e5"></i>near par</span><span><i style="background:#c98500"></i>Henry Hub</span><span>bigger dot = bigger basis</span></div>
       </div>
-      <div id="emap">${basisMapSVG()}</div>
-      <p class="muted" style="font-size:11px">Arrows = dominant physical flow. Ranges are rule-of-thumb monthly (bidweek) basis from recent years, compiled from public reporting — NOT live or licensed data. Check ICE forwards before trading anything.</p>
+      <div class="bx-map" id="emap">${basisMapSVG()}</div>
+      <p class="muted" style="font-size:11px;margin-top:8px">Arrows = dominant physical flow. Ranges are rule-of-thumb monthly (bidweek) basis from recent years, compiled from public reporting — NOT live or licensed data. Check ICE forwards before trading anything.</p>
     </div>
-    <div class="card" id="ehub">${hubCard(HUBS.find(h => h.id === E.hub))}</div>
+    <div class="card bx-panel" id="ehub">${hubCard(HUBS.find(h => h.id === E.hub))}</div>
   </div>
-  <div class="card" style="margin-top:14px"><h2>CORE IDEAS (read once, top to bottom)</h2>
-    ${CONCEPTS.map(([t, b], i) => `<p style="margin:8px 0"><b>${i + 1}. ${esc(t)}</b><br><span style="color:var(--sec)">${esc(b)}</span></p>`).join("")}
+  <div class="card" style="margin-top:14px"><h2>CORE IDEAS</h2>
+    <div class="bx-ideas">${CONCEPTS.map(([t, b], i) => `<div class="bx-idea"><b><span>${String(i + 1).padStart(2, "0")}</span>${esc(t)}</b><p>${esc(b)}</p></div>`).join("")}</div>
   </div>
   <div class="card" style="margin-top:14px"><h2>ALL HUBS — cheat sheet</h2>
-    <table class="tbl"><tr><th>hub</th><th>type</th><th class="num">winter basis</th><th class="num">summer basis</th></tr>
-    ${HUBS.map(h => `<tr class="click" data-h="${h.id}" style="cursor:pointer"><td>${esc(h.name)}</td><td><span style="color:${ARCH_COL[h.arch]}">●</span> ${ARCH_TXT[h.arch]}</td>
-      <td class="num">${brange(h.win)}</td><td class="num">${brange(h.sum)}</td></tr>`).join("")}</table>
+    <table class="tbl bx-tbl"><tr><th>hub</th><th>type</th><th class="num">winter basis</th><th class="num">summer basis</th><th style="width:28%">range (−$3 … +$10)</th></tr>
+    ${rows.map(h => `<tr class="click" data-h="${h.id}" style="cursor:pointer"><td>${esc(h.name)}<div class="muted" style="font-size:11px">${esc(h.region)}</div></td>
+      <td><span style="color:${ARCH_COL[h.arch]}">●</span> ${ARCH_TXT[h.arch]}</td>
+      <td class="num" style="color:${bcol(h.win)}">${brange(h.win)}</td><td class="num" style="color:${bcol(h.sum)}">${brange(h.sum)}</td>
+      <td>${rangeBar(h)}</td></tr>`).join("")}</table>
   </div>
   <div class="card" style="margin-top:14px" id="equiz"></div>`;
 
+  const redrawMap = () => { $("#emap").innerHTML = basisMapSVG(); bindMap(); };
   const bindMap = () => document.querySelectorAll("#emap .hubdot").forEach(g => g.onclick = () => selHub(g.dataset.h));
   const selHub = id => {
     E.hub = id;
-    $("#emap").innerHTML = basisMapSVG(); bindMap();
+    redrawMap();
     $("#ehub").innerHTML = hubCard(HUBS.find(h => h.id === id));
+    $("#ehub").scrollTop = 0;
+    document.querySelectorAll("tr[data-h]").forEach(r => r.classList.toggle("sel", r.dataset.h === id));
   };
   bindMap();
-  document.querySelectorAll("tr[data-h]").forEach(r => r.onclick = () => { selHub(r.dataset.h); $("#ehub").scrollIntoView({ behavior: "smooth", block: "nearest" }); });
+  document.querySelectorAll("tr[data-h]").forEach(r => r.onclick = () => { selHub(r.dataset.h); $("#emap").scrollIntoView({ behavior: "smooth", block: "nearest" }); });
   document.querySelectorAll("button[data-s]").forEach(b => b.onclick = () => {
     E.season = b.dataset.s;
     document.querySelectorAll("button[data-s]").forEach(x => x.classList.toggle("on", x === b));
-    $("#emap").innerHTML = basisMapSVG(); bindMap();
+    redrawMap();
   });
+  document.querySelectorAll("button[data-l]").forEach(b => b.onclick = () => {
+    E.labels = b.dataset.l;
+    document.querySelectorAll("button[data-l]").forEach(x => x.classList.toggle("on", x === b));
+    redrawMap();
+  });
+  selHub(E.hub);
+  scoreE();
   quizE();
+}
+
+function scoreE() {
+  const st = STATE.e;
+  $("#escore").textContent = st.n ? `drill ${st.ok}/${st.n} · ${Math.round(100 * st.ok / st.n)}%` : "drill 0/0";
 }
 
 function quizE() {
   const q = nextBasisQ(), st = STATE.e;
-  $("#equiz").innerHTML = `<h2>BASIS DRILL</h2><p style="margin-bottom:10px">${esc(q.q)}</p>
-    <div class="buckets" style="grid-template-columns:repeat(2,1fr)">
-    ${q.o.map((o, i) => `<button class="bk" data-i="${i}" style="text-align:left;padding:10px 12px">${esc(o)}</button>`).join("")}</div>
+  $("#equiz").innerHTML = `<h2>BASIS DRILL</h2><p style="margin-bottom:12px;font-size:14px">${esc(q.q)}</p>
+    <div class="bx-opts">${q.o.map((o, i) => `<button class="bx-opt" data-i="${i}"><b>${"ABCD"[i]}</b><span>${esc(o)}</span></button>`).join("")}</div>
     <div id="eans"></div>`;
-  document.querySelectorAll("#equiz .bk").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#equiz .bx-opt").forEach(b => b.onclick = () => {
     const ok = +b.dataset.i === q.a;
     st.n++; if (ok) st.ok++; saveState(STATE);
-    document.querySelectorAll("#equiz .bk").forEach(x => {
+    document.querySelectorAll("#equiz .bx-opt").forEach(x => {
       x.disabled = true;
-      if (+x.dataset.i === q.a) x.style.borderColor = "var(--pos)";
-      else if (x === b) x.style.borderColor = "var(--neg)";
+      if (+x.dataset.i === q.a) x.classList.add("ok");
+      else if (x === b) x.classList.add("bad");
     });
-    $("#eans").innerHTML = `<p style="margin-top:10px">${ok ? "<span class='pos'>CORRECT</span>" : `<span class='neg'>MISS</span> — answer: <b>${esc(q.o[q.a])}</b>`}</p>
-      <p style="color:var(--sec)">▸ ${esc(q.why)}</p>
-      <button class="btn" id="enext" style="margin-top:8px">NEXT QUESTION ▶</button>`;
-    document.querySelector(".roundhead .score").textContent = `basis drill ${st.ok}/${st.n}`;
+    $("#eans").innerHTML = `<div class="bx-ans ${ok ? "ok" : "bad"}">
+      <p>${ok ? "<span class='pos'>CORRECT</span>" : `<span class='neg'>MISS</span> — answer: <b>${esc(q.o[q.a])}</b>`}</p>
+      <p style="color:var(--sec);margin-top:4px">${esc(q.why)}</p></div>
+      <button class="btn" id="enext" style="margin-top:10px">NEXT QUESTION ▶</button>`;
+    scoreE();
     $("#enext").onclick = quizE;
   });
 }
